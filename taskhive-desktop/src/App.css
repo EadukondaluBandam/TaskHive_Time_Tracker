@@ -1,0 +1,45 @@
+.shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  padding: 24px;
+  background:
+    radial-gradient(circle at top, rgba(14, 116, 144, 0.18), transparent 40%),
+    linear-gradient(160deg, #020617, #0f172a 58%, #172554);
+  color: #e2e8f0;
+  font-family: "Segoe UI", Tahoma, sans-serif;
+}
+
+.shell-card {
+  width: min(560px, 100%);
+  padding: 32px;
+  border-radius: 24px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(15, 23, 42, 0.82);
+  box-shadow: 0 24px 60px rgba(2, 6, 23, 0.45);
+}
+
+.shell-kicker {
+  margin: 0 0 12px;
+  color: #38bdf8;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.shell-card h1 {
+  margin: 0 0 12px;
+  font-size: clamp(2rem, 5vw, 2.8rem);
+}
+
+.shell-card p {
+  margin: 0;
+  line-height: 1.6;
+  color: #cbd5e1;
+}
+
+.shell-card code {
+  color: #f8fafc;
+}

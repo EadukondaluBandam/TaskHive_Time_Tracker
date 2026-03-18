@@ -1,0 +1,56 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Dependencies
+node_modules/
+taskhive-desktop/node_modules/
+
+# Environment files
+.env
+.env.*
+!.env.example
+*.local
+
+# Build output
+dist/
+dist-ssr/
+coverage/
+vite.svg
+
+# Electron / packaging output
+taskhive-desktop/dist/
+taskhive-desktop/build/*.blockmap
+taskhive-desktop/release/
+taskhive-desktop/release-build/
+taskhive-desktop/release-build-*/
+taskhive-desktop/web-dist/
+public/downloads/
+
+# Binary artifacts
+*.exe
+*.dll
+*.7z
+*.zip
+*.msi
+*.dmg
+*.AppImage
+*.asar
+*.node
+
+# OS / editor files
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
