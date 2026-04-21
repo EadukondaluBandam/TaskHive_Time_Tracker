@@ -1,6 +1,52 @@
 // Comprehensive localStorage service for TaskHive
 
-import { User, Project, Task, TimeEntry, Activity } from './mockData';
+import { User, Project, Task, TimeEntry, Activity } from './types';
+
+const LEGACY_MOCK_USER_IDS = new Set(['1', '2', '3', '4', '5', '6', '7', '8', '9', '10']);
+const LEGACY_MOCK_USER_EMAILS = new Set([
+  'arjun.sharma@blackroth.com',
+  'priya.patel@blackroth.com',
+  'ramesh.kumar@blackroth.com',
+  'ananya.reddy@blackroth.com',
+  'karthik.nair@blackroth.com',
+  'kavya.iyer@blackroth.com',
+  'rohit.gupta@blackroth.com',
+  'lakshmi.menon@blackroth.com',
+  'suresh.venkat@blackroth.com',
+  'mahesh.krishnan@blackroth.com',
+]);
+const LEGACY_MOCK_USER_NAMES = new Set([
+  'Arjun Sharma',
+  'Priya Patel',
+  'Ramesh Kumar',
+  'Ananya Reddy',
+  'Karthik Nair',
+  'Kavya Iyer',
+  'Rohit Gupta',
+  'Lakshmi Menon',
+  'Suresh Venkat',
+  'Mahesh Krishnan',
+]);
+const LEGACY_MOCK_PROJECT_IDS = new Set(['p1', 'p2', 'p3', 'p4', 'p5']);
+const LEGACY_MOCK_PROJECT_NAMES = new Set([
+  'Bharat Banking Portal',
+  'Ayurveda Health App',
+  'Kisan Mitra Platform',
+  'Smart City Dashboard',
+  'Desi Commerce Platform',
+]);
+const LEGACY_MOCK_TASK_IDS = new Set(['t1', 't2', 't3', 't4', 't5', 't6', 't7', 't8']);
+const LEGACY_MOCK_TASK_NAMES = new Set([
+  'UPI Integration Module',
+  'User Authentication Flow',
+  'Dosha Assessment Quiz',
+  'Crop Price Prediction API',
+  'Weather Integration',
+  'Traffic Analytics Module',
+  'Vendor Onboarding Portal',
+  'Multi-language Support',
+]);
+const DEMO_SYSTEM_USER_IDS = new Set(['demo-admin', 'demo-employee', 'taskhive-superadmin']);
 
 // Storage Keys
 const KEYS = {
@@ -93,7 +139,11 @@ function normalizeStoredUsers(users: User[]): User[] {
 
     return {
       ...user,
-      password: user.role === 'admin' ? 'admin123' : 'employee123',
+      password: user.role === 'superadmin'
+        ? 'Taskhiveadmin@2026'
+        : user.role === 'admin'
+        ? 'admin123'
+        : 'employee123',
     };
   });
 
@@ -104,32 +154,110 @@ function normalizeStoredUsers(users: User[]): User[] {
   return normalized;
 }
 
-// Initialize storage with mock data if empty
-export function initializeStorage(mockData: {
-  users: User[];
-  projects: Project[];
-  tasks: Task[];
-  timeEntries: TimeEntry[];
-  activities: Activity[];
-}): void {
+function cleanupLegacyMockData(): void {
+  const users = getItem<User[]>(KEYS.USERS, []);
+  const cleanedUsers = users.filter((user) => (
+    !LEGACY_MOCK_USER_IDS.has(user.id) &&
+    !LEGACY_MOCK_USER_EMAILS.has(user.email.toLowerCase()) &&
+    user.companyName !== 'Blackroth Group'
+  ));
+  if (cleanedUsers.length !== users.length) {
+    setItem(KEYS.USERS, cleanedUsers);
+  }
+
+  const projects = getItem<Project[]>(KEYS.PROJECTS, []);
+  const cleanedProjects = projects.filter((project) => (
+    !LEGACY_MOCK_PROJECT_IDS.has(project.id) &&
+    !LEGACY_MOCK_PROJECT_NAMES.has(project.name)
+  ));
+  if (cleanedProjects.length !== projects.length) {
+    setItem(KEYS.PROJECTS, cleanedProjects);
+  }
+
+  const tasks = getItem<Task[]>(KEYS.TASKS, []);
+  const cleanedTasks = tasks.filter((task) => (
+    !LEGACY_MOCK_TASK_IDS.has(task.id) &&
+    !LEGACY_MOCK_TASK_NAMES.has(task.name) &&
+    !LEGACY_MOCK_PROJECT_NAMES.has(task.projectName)
+  ));
+  if (cleanedTasks.length !== tasks.length) {
+    setItem(KEYS.TASKS, cleanedTasks);
+  }
+
+  const timeEntries = getItem<TimeEntry[]>(KEYS.TIME_ENTRIES, []);
+  const cleanedTimeEntries = timeEntries.filter((entry) => (
+    !LEGACY_MOCK_USER_IDS.has(entry.userId) &&
+    !LEGACY_MOCK_USER_NAMES.has(entry.userName) &&
+    !LEGACY_MOCK_PROJECT_IDS.has(entry.projectId) &&
+    !LEGACY_MOCK_PROJECT_NAMES.has(entry.projectName) &&
+    !LEGACY_MOCK_TASK_IDS.has(entry.taskId) &&
+    !LEGACY_MOCK_TASK_NAMES.has(entry.taskName)
+  ));
+  if (cleanedTimeEntries.length !== timeEntries.length) {
+    setItem(KEYS.TIME_ENTRIES, cleanedTimeEntries);
+  }
+
+  const activities = getItem<Activity[]>(KEYS.ACTIVITIES, []);
+  const cleanedActivities = activities.filter((activity) => (
+    !LEGACY_MOCK_USER_IDS.has(activity.userId) &&
+    !LEGACY_MOCK_USER_NAMES.has(activity.userName) &&
+    !activity.timestamp.startsWith('2024-01-22')
+  ));
+  if (cleanedActivities.length !== activities.length) {
+    setItem(KEYS.ACTIVITIES, cleanedActivities);
+  }
+}
+
+function cleanupOrphanedTrackedData(): void {
+  const users = getItem<User[]>(KEYS.USERS, []);
+  const projects = getItem<Project[]>(KEYS.PROJECTS, []);
+  const tasks = getItem<Task[]>(KEYS.TASKS, []);
+  const validUserIds = new Set([...users.map((user) => user.id), ...DEMO_SYSTEM_USER_IDS]);
+  const validProjectIds = new Set(projects.map((project) => project.id));
+  const validTaskIds = new Set(tasks.map((task) => task.id));
+
+  const timeEntries = getItem<TimeEntry[]>(KEYS.TIME_ENTRIES, []);
+  const cleanedTimeEntries = timeEntries.filter((entry) => {
+    const hasValidUser = validUserIds.has(entry.userId);
+    const hasValidProject = !entry.projectId || validProjectIds.has(entry.projectId);
+    const hasValidTask = !entry.taskId || validTaskIds.has(entry.taskId);
+    return hasValidUser && hasValidProject && hasValidTask;
+  });
+
+  if (cleanedTimeEntries.length !== timeEntries.length) {
+    setItem(KEYS.TIME_ENTRIES, cleanedTimeEntries);
+  }
+
+  const activities = getItem<Activity[]>(KEYS.ACTIVITIES, []);
+  const cleanedActivities = activities.filter((activity) => validUserIds.has(activity.userId));
+  if (cleanedActivities.length !== activities.length) {
+    setItem(KEYS.ACTIVITIES, cleanedActivities);
+  }
+}
+
+// Initialize storage with empty collections if keys are missing
+export function initializeStorage(): void {
   if (!localStorage.getItem(KEYS.USERS)) {
-    setItem(KEYS.USERS, mockData.users);
+    setItem(KEYS.USERS, []);
   }
   if (!localStorage.getItem(KEYS.PROJECTS)) {
-    setItem(KEYS.PROJECTS, mockData.projects);
+    setItem(KEYS.PROJECTS, []);
   }
   if (!localStorage.getItem(KEYS.TASKS)) {
-    setItem(KEYS.TASKS, mockData.tasks);
+    setItem(KEYS.TASKS, []);
   }
   if (!localStorage.getItem(KEYS.TIME_ENTRIES)) {
-    setItem(KEYS.TIME_ENTRIES, mockData.timeEntries);
+    setItem(KEYS.TIME_ENTRIES, []);
   }
   if (!localStorage.getItem(KEYS.ACTIVITIES)) {
-    setItem(KEYS.ACTIVITIES, mockData.activities);
+    setItem(KEYS.ACTIVITIES, []);
   }
   if (!localStorage.getItem(KEYS.NOTIFICATIONS)) {
     setItem(KEYS.NOTIFICATIONS, []);
   }
+
+  cleanupLegacyMockData();
+  cleanupOrphanedTrackedData();
 
   const storedUsers = getItem<User[]>(KEYS.USERS, []);
   if (storedUsers.length > 0) {

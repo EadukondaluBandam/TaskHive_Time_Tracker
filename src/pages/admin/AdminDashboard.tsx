@@ -2,7 +2,6 @@ import { useNavigate } from 'react-router-dom';
 import {
   Users,
   Clock,
-  TrendingUp,
   FolderKanban,
   Activity,
   AlertCircle,
@@ -10,7 +9,7 @@ import {
 import { StatCard } from '@/components/StatCard';
 import { ProgressRing } from '@/components/ProgressRing';
 import { UserStorage, ProjectStorage, TaskStorage, TimeEntryStorage, TimerStorage } from '@/lib/storage';
-import { weeklyData, productivityByTeam } from '@/lib/mockData';
+import { buildDepartmentProductivity, buildWeeklyHours, getProjectHours, getUserHours } from '@/lib/analytics';
 import {
   BarChart,
   Bar,
@@ -29,6 +28,7 @@ export default function AdminDashboard() {
   const [projects, setProjects] = useState(ProjectStorage.getAll());
   const [tasks, setTasks] = useState(TaskStorage.getAll());
   const [activeTimers, setActiveTimers] = useState(TimerStorage.getAllActive());
+  const [timeEntries, setTimeEntries] = useState(TimeEntryStorage.getAll());
 
   useEffect(() => {
     // Refresh data periodically
@@ -37,6 +37,7 @@ export default function AdminDashboard() {
       setProjects(ProjectStorage.getAll());
       setTasks(TaskStorage.getAll());
       setActiveTimers(TimerStorage.getAllActive());
+      setTimeEntries(TimeEntryStorage.getAll());
     }, 5000);
     return () => clearInterval(interval);
   }, []);
@@ -44,8 +45,23 @@ export default function AdminDashboard() {
   const activeUsers = users.filter(u => u.status === 'active').length;
   const activeProjects = projects.filter(p => p.status === 'active').length;
   const pendingTasks = tasks.filter(t => t.status === 'pending').length;
-  const avgProductivity = Math.round(users.reduce((acc, u) => acc + u.productivity, 0) / users.length);
-  const totalHours = users.reduce((acc, u) => acc + u.totalHours, 0);
+  const avgProductivity = users.length > 0
+    ? Math.round(users.reduce((acc, u) => acc + u.productivity, 0) / users.length)
+    : 0;
+  const totalHours = timeEntries.reduce((acc, entry) => acc + entry.duration, 0) / 60;
+  const weeklyData = buildWeeklyHours(timeEntries);
+  const productivityByTeam = buildDepartmentProductivity(users);
+  const rankedUsers = users
+    .map((user) => ({
+      ...user,
+      totalHours: getUserHours(user, timeEntries),
+    }))
+    .sort((a, b) => b.productivity - a.productivity)
+    .slice(0, 5);
+  const projectsWithHours = projects.map((project) => ({
+    ...project,
+    totalHours: getProjectHours(project, timeEntries),
+  }));
 
   return (
     <div className="space-y-6">
@@ -75,14 +91,13 @@ export default function AdminDashboard() {
             variant="success"
           />
         </div>
-        <StatCard
-          title="Total Hours Tracked"
-          value={`${totalHours}h`}
-          subtitle="This month"
-          icon={Clock}
-          variant="warning"
-          trend={{ value: 8, isPositive: true }}
-        />
+          <StatCard
+            title="Total Hours Tracked"
+            value={`${totalHours.toFixed(1)}h`}
+            subtitle="This month"
+            icon={Clock}
+            variant="warning"
+          />
         <div onClick={() => navigate('/admin/tasks')} className="cursor-pointer">
           <StatCard
             title="Pending Tasks"
@@ -178,10 +193,7 @@ export default function AdminDashboard() {
             <Activity size={20} className="text-muted-foreground" />
           </div>
           <div className="space-y-3">
-            {users
-              .sort((a, b) => b.productivity - a.productivity)
-              .slice(0, 5)
-              .map((user, index) => (
+            {rankedUsers.map((user, index) => (
                 <div
                   key={user.id}
                   className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
@@ -209,7 +221,7 @@ export default function AdminDashboard() {
             <FolderKanban size={20} className="text-muted-foreground" />
           </div>
           <div className="space-y-4">
-            {projects.slice(0, 4).map((project) => (
+            {projectsWithHours.slice(0, 4).map((project) => (
               <div key={project.id} className="space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex-1 min-w-0">

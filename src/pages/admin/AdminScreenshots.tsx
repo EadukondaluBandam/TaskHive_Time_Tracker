@@ -1,20 +1,29 @@
+import { useEffect, useMemo, useState } from 'react';
 import { Camera, Monitor, Clock, Activity } from 'lucide-react';
 import { StatCard } from '@/components/StatCard';
-import { users } from '@/lib/mockData';
-
-const screenshots = [
-  { id: 1, user: 'Priya Patel', time: '10:30 AM', status: 'active', app: 'VS Code', activity: 92 },
-  { id: 2, user: 'Ramesh Kumar', time: '10:32 AM', status: 'active', app: 'IntelliJ IDEA', activity: 88 },
-  { id: 3, user: 'Ananya Reddy', time: '10:28 AM', status: 'idle', app: 'Figma', activity: 45 },
-  { id: 4, user: 'Karthik Nair', time: '10:35 AM', status: 'active', app: 'Terminal', activity: 95 },
-  { id: 5, user: 'Kavya Iyer', time: '10:29 AM', status: 'active', app: 'Chrome', activity: 78 },
-  { id: 6, user: 'Lakshmi Menon', time: '10:31 AM', status: 'away', app: 'Slack', activity: 0 },
-];
+import { UserStorage } from '@/lib/storage';
+import { getTrackingLogs, subscribeToTrackingLogChanges, type TrackingLog } from '@/services/trackingLogs';
+import { buildLiveSnapshots } from '@/lib/analytics';
 
 export default function AdminScreenshots() {
+  const [logs, setLogs] = useState<TrackingLog[]>(getTrackingLogs());
+  const [users, setUsers] = useState(UserStorage.getAll());
+
+  useEffect(() => {
+    const refresh = () => {
+      setLogs(getTrackingLogs());
+      setUsers(UserStorage.getAll());
+    };
+
+    refresh();
+    return subscribeToTrackingLogChanges(refresh);
+  }, []);
+
+  const screenshots = useMemo(() => buildLiveSnapshots(logs, users), [logs, users]);
   const activeCount = screenshots.filter(s => s.status === 'active').length;
   const idleCount = screenshots.filter(s => s.status === 'idle').length;
   const awayCount = screenshots.filter(s => s.status === 'away').length;
+  const lastCapture = screenshots[0]?.time || 'No data';
 
   return (
     <div className="space-y-6">
@@ -46,8 +55,8 @@ export default function AdminScreenshots() {
         />
         <StatCard
           title="Last Capture"
-          value="10:35 AM"
-          subtitle="2 minutes ago"
+          value={lastCapture}
+          subtitle={screenshots.length > 0 ? 'Latest synced activity' : 'Waiting for activity data'}
           icon={Camera}
           variant="primary"
         />

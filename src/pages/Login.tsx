@@ -37,7 +37,7 @@ export default function Login() {
       const savedUser = localStorage.getItem('taskhive_user');
       if (savedUser) {
         const user = JSON.parse(savedUser);
-        if (user.role === 'admin') {
+        if (user.role === 'admin' || user.role === 'superadmin') {
           navigate('/admin/dashboard');
         } else {
           navigate('/employee/dashboard');

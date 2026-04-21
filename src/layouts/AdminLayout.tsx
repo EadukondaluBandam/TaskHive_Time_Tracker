@@ -46,6 +46,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
 
+  const roleLabel = user?.role === 'superadmin' ? 'Super Administrator' : 'Administrator';
+
   const handleLogout = () => {
     logout();
     navigate('/login', { replace: true });
@@ -113,7 +115,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-foreground truncate">{user?.name}</p>
-                  <p className="text-xs text-muted-foreground">Administrator</p>
+                  <p className="text-xs text-muted-foreground">{roleLabel}</p>
                 </div>
               </div>
             )}

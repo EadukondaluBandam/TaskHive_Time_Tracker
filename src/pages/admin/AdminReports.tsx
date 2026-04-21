@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { FileText, Users, FolderKanban, ListTodo, Download, Calendar, FileSpreadsheet, FileJson } from 'lucide-react';
 import { UserStorage, ProjectStorage, TaskStorage, TimeEntryStorage, ExportUtils, DateUtils } from '@/lib/storage';
-import { weeklyData } from '@/lib/mockData';
+import { buildWeeklyHours, getProjectHours, getUserHours } from '@/lib/analytics';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
@@ -59,9 +59,10 @@ export default function AdminReports() {
 
   const userHoursData = users.slice(0, 6).map(u => ({
     name: u.name.split(' ')[0],
-    hours: u.totalHours,
+    hours: getUserHours(u, timeEntries),
     productivity: u.productivity,
   }));
+  const weeklyData = buildWeeklyHours(timeEntries);
 
   const projectStatusData = [
     { name: 'Active', value: projects.filter(p => p.status === 'active').length },
@@ -317,7 +318,7 @@ export default function AdminReports() {
               <p className="text-sm text-muted-foreground">Total Tasks</p>
             </div>
             <div className="bg-card rounded-xl border border-border p-5">
-              <p className="text-3xl font-bold text-foreground">{users.reduce((acc, u) => acc + u.totalHours, 0)}h</p>
+              <p className="text-3xl font-bold text-foreground">{(timeEntries.reduce((acc, te) => acc + te.duration, 0) / 60).toFixed(1)}h</p>
               <p className="text-sm text-muted-foreground">Total Hours</p>
             </div>
           </div>
@@ -370,7 +371,7 @@ export default function AdminReports() {
                       </span>
                     </td>
                     <td className="p-4 text-muted-foreground">{project.team.length}</td>
-                    <td className="p-4 text-muted-foreground">{project.totalHours}h</td>
+                    <td className="p-4 text-muted-foreground">{getProjectHours(project, timeEntries)}h</td>
                     <td className="p-4">
                       <div className="flex items-center gap-2">
                         <div className="w-24 h-2 bg-muted rounded-full overflow-hidden">

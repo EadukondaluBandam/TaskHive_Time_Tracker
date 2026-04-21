@@ -1,7 +1,9 @@
+import { useMemo } from 'react';
 import { TrendingUp, Users, Award, Target } from 'lucide-react';
 import { StatCard } from '@/components/StatCard';
-import { users, productivityByTeam } from '@/lib/mockData';
 import { ProgressRing } from '@/components/ProgressRing';
+import { UserStorage } from '@/lib/storage';
+import { buildDepartmentProductivity } from '@/lib/analytics';
 import {
   BarChart,
   Bar,
@@ -18,8 +20,12 @@ import {
 } from 'recharts';
 
 export default function AdminProductivity() {
-  const avgProductivity = Math.round(users.reduce((acc, u) => acc + u.productivity, 0) / users.length);
-  const topPerformer = users.reduce((prev, current) => (prev.productivity > current.productivity) ? prev : current);
+  const users = UserStorage.getAll();
+  const productivityByTeam = useMemo(() => buildDepartmentProductivity(users), [users]);
+  const avgProductivity = users.length > 0 ? Math.round(users.reduce((acc, u) => acc + u.productivity, 0) / users.length) : 0;
+  const topPerformer = users.length > 0
+    ? users.reduce((prev, current) => (prev.productivity > current.productivity) ? prev : current)
+    : null;
 
   const radarData = productivityByTeam.map(t => ({
     team: t.team,
@@ -52,8 +58,8 @@ export default function AdminProductivity() {
         />
         <StatCard
           title="Top Performer"
-          value={topPerformer.name.split(' ')[0]}
-          subtitle={`${topPerformer.productivity}% efficiency`}
+          value={topPerformer?.name.split(' ')[0] || 'N/A'}
+          subtitle={topPerformer ? `${topPerformer.productivity}% efficiency` : 'No employee data yet'}
           icon={Award}
           variant="warning"
         />

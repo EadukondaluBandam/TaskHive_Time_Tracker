@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Play, Pause, Square, Clock, Coffee } from 'lucide-react';
 import { ProjectStorage, TaskStorage, TimeEntryStorage, DateUtils } from '@/lib/storage';
-import { Project, Task } from '@/lib/mockData';
+import { Project, Task } from '@/lib/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTimer } from '@/contexts/TimerContext';
 import { Button } from '@/components/ui/button';

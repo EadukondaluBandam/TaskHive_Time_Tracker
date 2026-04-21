@@ -3,9 +3,9 @@ import { Clock, Calendar, TrendingUp, Timer, Play, Pause, Square } from 'lucide-
 import { StatCard } from '@/components/StatCard';
 import { ProgressRing } from '@/components/ProgressRing';
 import { TimeEntryStorage, ProjectStorage, TaskStorage, DateUtils } from '@/lib/storage';
+import { getTrackingLogsByUser, subscribeToTrackingLogChanges, type TrackingLog } from '@/services/trackingLogs';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTimer } from '@/contexts/TimerContext';
-import { useNavigate } from 'react-router-dom';
 import {
   BarChart,
   Bar,
@@ -22,12 +22,11 @@ import SEO from '@/components/SEO';
 export default function EmployeeDashboard() {
   const { user } = useAuth();
   const { timerState, isRunning, isPaused, elapsedSeconds, pauseTimer, resumeTimer, stopTimer, startTimer } = useTimer();
-  const navigate = useNavigate();
-  
   const [todayEntries, setTodayEntries] = useState(TimeEntryStorage.getByUserAndDate(user?.id || '', DateUtils.today()));
   const [weeklyData, setWeeklyData] = useState<{ day: string; hours: number }[]>([]);
   const [tasks, setTasks] = useState(TaskStorage.getAll());
   const [projects, setProjects] = useState(ProjectStorage.getAll());
+  const [logs, setLogs] = useState<TrackingLog[]>([]);
 
   useEffect(() => {
     if (!user) return;
@@ -52,6 +51,12 @@ export default function EmployeeDashboard() {
     setProjects(ProjectStorage.getAll());
   }, [user, elapsedSeconds]);
 
+  useEffect(() => {
+    const refresh = () => setLogs(getTrackingLogsByUser(user));
+    refresh();
+    return subscribeToTrackingLogChanges(refresh);
+  }, [user]);
+
   const formatTime = (seconds: number) => {
     const h = Math.floor(seconds / 3600);
     const m = Math.floor((seconds % 3600) / 60);
@@ -61,6 +66,10 @@ export default function EmployeeDashboard() {
 
   const totalTodayMinutes = todayEntries.reduce((acc, te) => acc + te.duration, 0) + Math.floor(elapsedSeconds / 60);
   const weeklyTotal = weeklyData.reduce((acc, d) => acc + d.hours, 0) + (elapsedSeconds / 3600);
+  const totalTrackedSeconds = logs.reduce((sum, log) => sum + log.duration, 0);
+  const browserSeconds = logs.filter((log) => log.website).reduce((sum, log) => sum + log.duration, 0);
+  const activeSeconds = Math.max(0, totalTrackedSeconds - browserSeconds);
+  const productivity = totalTrackedSeconds > 0 ? Math.round((activeSeconds / totalTrackedSeconds) * 100) : 0;
   
   const myTasks = tasks.filter(t => user && t.assignees.includes(user.name));
   const activeTasks = myTasks.filter(t => t.status === 'in-progress');
@@ -69,13 +78,6 @@ export default function EmployeeDashboard() {
   const currentTask = timerState && timerState.taskId ? TaskStorage.getById(timerState.taskId) : null;
 
   const [quickDesc, setQuickDesc] = useState('');
-  const [quickProject, setQuickProject] = useState<string | null>(projects[0]?.id || null);
-  const [quickTask, setQuickTask] = useState<string | null>(tasks[0]?.id || null);
-
-  useEffect(() => {
-    setQuickProject(projects[0]?.id || null);
-    setQuickTask(tasks.find(t => t.projectId === projects[0]?.id)?.id || tasks[0]?.id || null);
-  }, [projects, tasks]);
 
   const handleQuickStart = () => {
     // Manual dashboard start: do not attach project/task here
@@ -194,10 +196,9 @@ export default function EmployeeDashboard() {
         />
         <StatCard
           title="Productivity"
-          value="88%"
+          value={`${productivity}%`}
           icon={TrendingUp}
           variant="warning"
-          trend={{ value: 3, isPositive: true }}
         />
         <StatCard
           title="Active Tasks"
@@ -233,7 +234,7 @@ export default function EmployeeDashboard() {
         <div className="bg-card rounded-xl border border-border p-6">
           <h3 className="text-lg font-semibold text-foreground mb-4">Today's Breakdown</h3>
           <div className="flex flex-col items-center">
-            <ProgressRing value={88} size={140} strokeWidth={10} label="Efficiency" />
+            <ProgressRing value={productivity} size={140} strokeWidth={10} label="Efficiency" />
             <div className="mt-6 w-full space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -241,7 +242,7 @@ export default function EmployeeDashboard() {
                   <span className="text-sm text-muted-foreground">Active</span>
                 </div>
                 <span className="text-sm font-medium text-foreground">
-                  {Math.floor(totalTodayMinutes * 0.88 / 60)}h {Math.floor(totalTodayMinutes * 0.88 % 60)}m
+                  {Math.floor(activeSeconds / 3600)}h {Math.floor((activeSeconds % 3600) / 60)}m
                 </span>
               </div>
               <div className="flex items-center justify-between">
@@ -250,7 +251,7 @@ export default function EmployeeDashboard() {
                   <span className="text-sm text-muted-foreground">Idle</span>
                 </div>
                 <span className="text-sm font-medium text-foreground">
-                  {Math.floor(totalTodayMinutes * 0.08 / 60)}h {Math.floor(totalTodayMinutes * 0.08 % 60)}m
+                  {Math.floor(browserSeconds / 3600)}h {Math.floor((browserSeconds % 3600) / 60)}m
                 </span>
               </div>
               <div className="flex items-center justify-between">
@@ -259,7 +260,7 @@ export default function EmployeeDashboard() {
                   <span className="text-sm text-muted-foreground">Away</span>
                 </div>
                 <span className="text-sm font-medium text-foreground">
-                  {Math.floor(totalTodayMinutes * 0.04 / 60)}h {Math.floor(totalTodayMinutes * 0.04 % 60)}m
+                  0h 0m
                 </span>
               </div>
             </div>

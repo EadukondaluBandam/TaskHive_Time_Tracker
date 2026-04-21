@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Search, Filter, MoreVertical, UserCheck, UserX, Eye, TrendingUp, Plus, Trash2, Lock } from 'lucide-react';
 import { UserStorage, NotificationStorage } from '@/lib/storage';
-import { User } from '@/lib/mockData';
+import { User } from '@/lib/types';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import {

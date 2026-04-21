@@ -40,13 +40,18 @@ const Router = window.location.protocol === 'file:' ? HashRouter : BrowserRouter
 
 function ProtectedRoute({ children, requiredRole }: { children: React.ReactNode; requiredRole?: 'admin' | 'employee' }) {
   const { user, isAuthenticated } = useAuth();
+  const isAdminRole = user?.role === 'admin' || user?.role === 'superadmin';
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
 
-  if (requiredRole && user?.role !== requiredRole) {
-    return <Navigate to={user?.role === 'admin' ? '/admin/dashboard' : '/employee/dashboard'} replace />;
+  if (requiredRole === 'admin' && !isAdminRole) {
+    return <Navigate to="/employee/dashboard" replace />;
+  }
+
+  if (requiredRole === 'employee' && user?.role !== 'employee') {
+    return <Navigate to="/admin/dashboard" replace />;
   }
 
   return <>{children}</>;
@@ -64,7 +69,7 @@ function AppRoutes() {
         path="/login"
         element={
           isAuthenticated ? (
-            <Navigate to={user?.role === 'admin' ? '/admin/dashboard' : '/employee/dashboard'} replace />
+            <Navigate to={user?.role === 'employee' ? '/employee/dashboard' : '/admin/dashboard'} replace />
           ) : (
             <Login />
           )

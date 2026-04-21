@@ -27,6 +27,7 @@ export default function AdminProfile() {
     otpSent: false,
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const roleLabel = user?.role === 'superadmin' ? 'Super Administrator' : 'Administrator';
 
   useEffect(() => {
     if (user) {
@@ -36,7 +37,7 @@ export default function AdminProfile() {
       setProfileData({
         firstName: first || '',
         lastName: rest.join(' ') || '',
-        companyName: user.companyName || 'Blackroth Group',
+        companyName: user.companyName || '',
       });
       const savedImage = localStorage.getItem(`profile_image_${user.id}`);
       if (savedImage) setProfileImage(savedImage);
@@ -138,7 +139,7 @@ export default function AdminProfile() {
             <h3 className="text-xl font-semibold text-foreground">{user?.name}</h3>
             <p className="text-muted-foreground">{user?.email}</p>
             <div className="flex items-center gap-2 mt-2 justify-center md:justify-start">
-              <span className="px-3 py-1 text-xs font-medium bg-primary/10 text-primary rounded-full border">Administrator</span>
+              <span className="px-3 py-1 text-xs font-medium bg-primary/10 text-primary rounded-full border">{roleLabel}</span>
             </div>
           </div>
 

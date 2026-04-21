@@ -1,6 +1,11 @@
-import { TrendingUp, Clock, Target, Award } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { TrendingUp, Clock, Target } from 'lucide-react';
 import { StatCard } from '@/components/StatCard';
 import { ProgressRing } from '@/components/ProgressRing';
+import { useAuth } from '@/contexts/AuthContext';
+import { TimeEntryStorage } from '@/lib/storage';
+import { buildMonthlyWeeks, buildWeeklyHours } from '@/lib/analytics';
+import { getTrackingLogsByUser, subscribeToTrackingLogChanges, type TrackingLog } from '@/services/trackingLogs';
 import {
   LineChart,
   Line,
@@ -13,79 +18,97 @@ import {
   Area,
 } from 'recharts';
 
-const weeklyProductivity = [
-  { day: 'Mon', productivity: 88 },
-  { day: 'Tue', productivity: 92 },
-  { day: 'Wed', productivity: 85 },
-  { day: 'Thu', productivity: 90 },
-  { day: 'Fri', productivity: 87 },
-];
-
-const monthlyTrend = [
-  { week: 'Week 1', productivity: 82, target: 85 },
-  { week: 'Week 2', productivity: 86, target: 85 },
-  { week: 'Week 3', productivity: 88, target: 85 },
-  { week: 'Week 4', productivity: 91, target: 85 },
-];
+function formatDuration(totalSeconds: number) {
+  const totalMinutes = Math.round(totalSeconds / 60);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  return `${minutes}m`;
+}
 
 export default function EmployeeProductivity() {
+  const { user } = useAuth();
+  const [logs, setLogs] = useState<TrackingLog[]>([]);
+  const [entries, setEntries] = useState(TimeEntryStorage.getAll());
+
+  useEffect(() => {
+    const refresh = () => {
+      setEntries(TimeEntryStorage.getAll());
+      setLogs(getTrackingLogsByUser(user));
+    };
+
+    refresh();
+    return subscribeToTrackingLogChanges(refresh);
+  }, [user]);
+
+  const myEntries = entries.filter((entry) => entry.userId === user?.id);
+  const weeklyProductivity = buildWeeklyHours(myEntries, user?.id).map((item) => ({
+    day: item.day,
+    productivity: Math.min(100, Math.round(item.hours * 10)),
+  }));
+  const monthlyTrend = buildMonthlyWeeks(myEntries, user?.id);
+
+  const totalTrackedSeconds = logs.reduce((sum, log) => sum + log.duration, 0);
+  const browserSeconds = logs.filter((log) => log.website).reduce((sum, log) => sum + log.duration, 0);
+  const activeSeconds = Math.max(0, totalTrackedSeconds - browserSeconds);
+  const currentScore = totalTrackedSeconds > 0 ? Math.round((activeSeconds / totalTrackedSeconds) * 100) : 0;
+  const weeklyAverage = weeklyProductivity.length > 0
+    ? Math.round(weeklyProductivity.reduce((sum, item) => sum + item.productivity, 0) / weeklyProductivity.length)
+    : 0;
+  const monthlyAverage = monthlyTrend.length > 0
+    ? Math.round(monthlyTrend.reduce((sum, item) => sum + item.productivity, 0) / monthlyTrend.length)
+    : 0;
+
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div>
         <h2 className="text-2xl font-bold text-foreground">Productivity</h2>
         <p className="text-muted-foreground">Your productivity summary and efficiency metrics</p>
       </div>
 
-      {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <StatCard
           title="Current Score"
-          value="88%"
+          value={`${currentScore}%`}
           icon={TrendingUp}
           variant="primary"
-          trend={{ value: 5, isPositive: true }}
         />
         <StatCard
           title="Weekly Average"
-          value="88%"
+          value={`${weeklyAverage}%`}
           icon={Clock}
           variant="success"
         />
         <StatCard
           title="Monthly Average"
-          value="87%"
+          value={`${monthlyAverage}%`}
           icon={Target}
           variant="warning"
         />
-    
       </div>
 
-      {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Productivity Ring */}
         <div className="bg-card rounded-xl border border-border p-6">
           <h3 className="text-lg font-semibold text-foreground mb-6">Today's Efficiency</h3>
           <div className="flex flex-col items-center">
-            <ProgressRing value={88} size={200} strokeWidth={16} label="Efficiency" />
+            <ProgressRing value={currentScore} size={200} strokeWidth={16} label="Efficiency" />
             <div className="mt-8 grid grid-cols-3 gap-4 w-full">
               <div className="text-center p-3 bg-success/10 rounded-lg">
-                <p className="text-xl font-bold text-success">6h 12m</p>
+                <p className="text-xl font-bold text-success">{formatDuration(activeSeconds)}</p>
                 <p className="text-xs text-muted-foreground">Active Time</p>
               </div>
               <div className="text-center p-3 bg-warning/10 rounded-lg">
-                <p className="text-xl font-bold text-warning">48m</p>
+                <p className="text-xl font-bold text-warning">{formatDuration(browserSeconds)}</p>
                 <p className="text-xs text-muted-foreground">Idle Time</p>
               </div>
               <div className="text-center p-3 bg-muted/30 rounded-lg">
-                <p className="text-xl font-bold text-muted-foreground">30m</p>
-                <p className="text-xs text-muted-foreground">Breaks</p>
+                <p className="text-xl font-bold text-muted-foreground">{myEntries.length}</p>
+                <p className="text-xs text-muted-foreground">Logged Entries</p>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Weekly Trend */}
         <div className="bg-card rounded-xl border border-border p-6">
           <h3 className="text-lg font-semibold text-foreground mb-4">This Week's Trend</h3>
           <ResponsiveContainer width="100%" height={280}>
@@ -98,7 +121,7 @@ export default function EmployeeProductivity() {
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
               <XAxis dataKey="day" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-              <YAxis domain={[70, 100]} stroke="hsl(var(--muted-foreground))" fontSize={12} />
+              <YAxis domain={[0, 100]} stroke="hsl(var(--muted-foreground))" fontSize={12} />
               <Tooltip
                 contentStyle={{
                   backgroundColor: 'hsl(var(--card))',
@@ -118,14 +141,13 @@ export default function EmployeeProductivity() {
         </div>
       </div>
 
-      {/* Monthly Trend */}
       <div className="bg-card rounded-xl border border-border p-6">
         <h3 className="text-lg font-semibold text-foreground mb-4">Monthly Progress</h3>
         <ResponsiveContainer width="100%" height={300}>
           <LineChart data={monthlyTrend}>
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
             <XAxis dataKey="week" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-            <YAxis domain={[75, 95]} stroke="hsl(var(--muted-foreground))" fontSize={12} />
+            <YAxis domain={[0, 100]} stroke="hsl(var(--muted-foreground))" fontSize={12} />
             <Tooltip
               contentStyle={{
                 backgroundColor: 'hsl(var(--card))',
@@ -164,13 +186,12 @@ export default function EmployeeProductivity() {
         </div>
       </div>
 
-      {/* Tips */}
       <div className="bg-primary/5 border border-primary/20 rounded-xl p-6">
         <h3 className="text-lg font-semibold text-foreground mb-3">Productivity Tips</h3>
         <ul className="space-y-2 text-sm text-muted-foreground">
-          <li>• Your productivity peaks between 10 AM - 12 PM. Schedule important tasks during this time.</li>
-          <li>• You've been consistent this week! Keep up the good work.</li>
-          <li>• Consider taking a 5-minute break every 90 minutes to maintain focus.</li>
+          <li>Review your tracked apps and sites to spot distractions early.</li>
+          <li>Consistent task descriptions make your reports and approvals much clearer.</li>
+          <li>Start timers from the tracker when possible so time stays attached to the right task.</li>
         </ul>
       </div>
     </div>

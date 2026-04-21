@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Search, Plus, MoreVertical, Edit, Trash2, CheckCircle, Clock, AlertCircle } from 'lucide-react';
 import { TaskStorage, ProjectStorage, UserStorage, NotificationStorage } from '@/lib/storage';
-import { User, Task, Project } from '@/lib/mockData';
+import { User, Task, Project } from '@/lib/types';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import {

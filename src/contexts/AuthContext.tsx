@@ -5,16 +5,18 @@ import {
   NotificationStorage, 
   TimerStorage,
   TimeEntryStorage,
+  ProjectStorage,
+  TaskStorage,
   initializeStorage 
 } from '@/lib/storage';
-import { users, projects, tasks, timeEntries, activities, User } from '@/lib/mockData';
+import { User } from '@/lib/types';
 import { toast } from 'sonner';
 
 interface AuthUser {
   id: string;
   name: string;
   email: string;
-  role: 'admin' | 'employee';
+  role: 'superadmin' | 'admin' | 'employee';
   department: string;
   companyName?: string;
 }
@@ -45,6 +47,18 @@ const AUTO_LOGOUT_HOURS = 10;
 const WARNING_HOURS = 9.67;
 
 const DEMO_CREDENTIALS = {
+  superadmin: {
+    email: 'superadmin@taskhive.com',
+    password: 'Taskhiveadmin@2026',
+    user: {
+      id: 'taskhive-superadmin',
+      name: 'TaskHive Super Admin',
+      email: 'superadmin@taskhive.com',
+      role: 'superadmin' as const,
+      department: 'TaskHive',
+      companyName: 'TaskHive'
+    }
+  },
   admin: {
     email: 'admin@demo.com',
     password: 'admin123',
@@ -54,7 +68,7 @@ const DEMO_CREDENTIALS = {
       email: 'admin@demo.com',
       role: 'admin' as const,
       department: 'Management',
-      companyName: 'Blackroth Group'
+      companyName: 'Demo Company'
     }
   },
   employee: {
@@ -81,6 +95,10 @@ function toAuthUser(user: AuthUser | User): AuthUser {
   };
 }
 
+function isAdminRole(role: AuthUser['role']) {
+  return role === 'admin' || role === 'superadmin';
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [sessionHours, setSessionHours] = useState(0);
@@ -97,6 +115,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSessionHours(SessionStorage.getElapsedHours());
         return;
       } catch {
+        // Ignore invalid persisted auth payloads and fall back to signed-out state.
       }
     }
 
@@ -106,7 +125,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    initializeStorage({ users, projects, tasks, timeEntries, activities });
+    initializeStorage();
     syncAuthFromStorage();
   }, [syncAuthFromStorage]);
 
@@ -159,8 +178,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const timerState = TimerStorage.get(user.id);
     if (timerState && timerState.isRunning) {
-      const project = projects.find(p => p.id === timerState.projectId);
-      const task = tasks.find(t => t.id === timerState.taskId);
+      const project = timerState.projectId ? ProjectStorage.getById(timerState.projectId) : undefined;
+      const task = timerState.taskId ? TaskStorage.getById(timerState.taskId) : undefined;
       
       TimeEntryStorage.create({
         userId: user.id,
@@ -179,7 +198,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       TimerStorage.clear(user.id);
     }
 
-    const admins = UserStorage.getAll().filter(u => u.role === 'admin');
+    const admins = UserStorage.getAll().filter(u => u.role === 'admin' || u.role === 'superadmin');
     admins.forEach(admin => {
       NotificationStorage.notifyAutoLogout(user.id, admin.id);
     });
@@ -195,6 +214,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
     await new Promise(resolve => setTimeout(resolve, 500));
+
+    if (email.toLowerCase() === DEMO_CREDENTIALS.superadmin.email && password === DEMO_CREDENTIALS.superadmin.password) {
+      const demoUser = DEMO_CREDENTIALS.superadmin.user;
+      const authUser = toAuthUser(demoUser);
+      setUser(authUser);
+      setWarningShown(false);
+      setSessionHours(0);
+      
+      localStorage.setItem('taskhive_user', JSON.stringify(authUser));
+      SessionStorage.create(demoUser.id);
+      NotificationStorage.notifyLogin(demoUser.id);
+
+      toast.success('Welcome back!', {
+        description: `Logged in as ${demoUser.name}`,
+      });
+
+      return { success: true };
+    }
 
     if (email.toLowerCase() === DEMO_CREDENTIALS.admin.email && password === DEMO_CREDENTIALS.admin.password) {
       const demoUser = DEMO_CREDENTIALS.admin.user;
@@ -336,8 +373,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (user) {
       const timerState = TimerStorage.get(user.id);
       if (timerState && timerState.isRunning) {
-        const project = projects.find(p => p.id === timerState.projectId);
-        const task = tasks.find(t => t.id === timerState.taskId);
+        const project = timerState.projectId ? ProjectStorage.getById(timerState.projectId) : undefined;
+        const task = timerState.taskId ? TaskStorage.getById(timerState.taskId) : undefined;
         
         TimeEntryStorage.create({
           userId: user.id,
